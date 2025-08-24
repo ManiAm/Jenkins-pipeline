@@ -1,0 +1,77 @@
+services:
+
+  controller:
+    build: ./controller
+    container_name: controller
+    hostname: controller
+    user: root
+    networks: [jenkins_net]
+    ports:
+      - "8081:8080"      # UI & WebSocket agents via 8080
+      - "50000:50000"    # only needed for TCP JNLP agent (agent_jnlp)
+    environment:
+      - JENKINS_SLAVE_AGENT_PORT=50000
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+      - CASC_JENKINS_CONFIG=/var/jenkins_home/casc/jenkins.yaml
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - jenkins_keys:/keys
+    restart: unless-stopped
+
+  agent_ssh:
+    build: ./agents-ssh
+    container_name: agent_ssh
+    hostname: agent_ssh
+    networks: [jenkins_net]
+    environment:
+      - AGENT_WORKDIR=/home/jenkins/agent
+      - AUTH_KEY_FILE=/keys/id_rsa.pub
+    volumes:
+      - ubuntu_ssh_work:/home/jenkins/agent
+      - jenkins_keys:/keys:ro
+    restart: unless-stopped
+    depends_on: [controller]
+
+  # JNLP over TCP (50000)
+  agent_jnlp:
+    build: ./agents
+    container_name: agent_jnlp
+    hostname: agent_jnlp
+    networks: [jenkins_net]
+    environment:
+      - JENKINS_URL=http://controller:8080
+      - JENKINS_AGENT_NAME=ubuntu_jnlp
+      - JENKINS_SECRET_FILE=/keys/ubuntu_jnlp.secret
+    volumes:
+      - ubuntu_jnlp_work:/home/jenkins/agent
+      - jenkins_keys:/keys:ro
+    restart: unless-stopped
+    depends_on: [controller]
+
+  # JNLP over WebSocket
+  agent_jnlp_ws:
+    build: ./agents
+    container_name: agent_jnlp_ws
+    hostname: agent_jnlp_ws
+    networks: [jenkins_net]
+    environment:
+      - JENKINS_URL=http://controller:8080
+      - JENKINS_AGENT_NAME=ubuntu_ws
+      - JENKINS_SECRET_FILE=/keys/ubuntu_ws.secret
+      - JENKINS_WEB_SOCKET=true
+    volumes:
+      - ubuntu_ws_work:/home/jenkins/agent
+      - jenkins_keys:/keys:ro
+    restart: unless-stopped
+    depends_on: [controller]
+
+networks:
+  jenkins_net:
+    name: jenkins_net
+
+volumes:
+  jenkins_home:
+  jenkins_keys:
+  ubuntu_ssh_work:
+  ubuntu_jnlp_work:
+  ubuntu_ws_work:
