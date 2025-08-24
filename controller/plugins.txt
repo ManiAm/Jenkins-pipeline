@@ -1,0 +1,11 @@
+configuration-as-code
+workflow-aggregator
+ssh-slaves
+credentials
+credentials-binding
+git
+github
+generic-webhook-trigger
+job-dsl
+matrix-auth
+blueocean

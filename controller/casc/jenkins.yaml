@@ -1,0 +1,103 @@
+jenkins:
+
+  systemMessage: |
+    Managed by JCasC. Do not edit in UI.
+
+  # Disable builds on the built-in node (controller)
+  numExecutors: 0
+
+  slaveAgentPort: 50000
+
+  # SECURITY REALM: local user db, no self-signup
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_USER:-admin}"
+          password: "${readFile:/keys/admin_password}"
+
+  # AUTHORIZATION: least privilege; no Anonymous perms
+  authorizationStrategy:
+    globalMatrix:
+      entries:
+        - user:
+            name: "${JENKINS_ADMIN_USER:-admin}"
+            permissions:
+              - "Overall/Administer"
+        # allow read to any logged-in user
+        - group:
+            name: "authenticated"
+            permissions:
+              - "Overall/Read"
+              - "View/Read"
+
+  remotingSecurity:
+    enabled: true
+
+  # CSRF protection
+  crumbIssuer:
+    standard:
+      excludeClientIPFromCrumb: false
+
+  nodes:
+
+    - permanent:
+        name: "agent_ssh"
+        remoteFS: "/home/jenkins/agent"
+        labelString: "linux ssh"
+        numExecutors: 2
+        mode: NORMAL
+        retentionStrategy: "always"
+        launcher:
+          ssh:
+            host: "agent_ssh"
+            port: 22
+            credentialsId: "ssh-key"
+            # Trust initial host key (fine for your Compose LAN)
+            sshHostKeyVerificationStrategy:
+              manuallyTrustedKeyVerificationStrategy:
+                requireInitialManualTrust: false
+
+    - permanent:
+        name: "ubuntu_jnlp"
+        remoteFS: "/home/jenkins/agent"
+        labelString: "linux jnlp"
+        numExecutors: 2
+        retentionStrategy: "always"
+        launcher:
+          inbound:
+            webSocket: false
+            workDirSettings:
+              disabled: true
+              internalDir: "remoting"
+              workDirPath: "/home/jenkins/agent"
+
+    - permanent:
+        name: "ubuntu_ws"
+        remoteFS: "/home/jenkins/agent"
+        labelString: "linux ws"
+        numExecutors: 2
+        retentionStrategy: "always"
+        launcher:
+          inbound:
+            webSocket: true
+            workDirSettings:
+              disabled: true
+              internalDir: "remoting"
+              workDirPath: "/home/jenkins/agent"
+
+unclassified:
+  location:
+    url: "http://localhost:8081/"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - basicSSHUserPrivateKey:
+              scope: SYSTEM
+              id: "ssh-key"
+              username: "jenkins"
+              privateKeySource:
+                directEntry:
+                  privateKey: "${readFile:/keys/id_rsa}"
